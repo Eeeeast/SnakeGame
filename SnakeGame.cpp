@@ -5,18 +5,18 @@
 #include <thread>
 #include <vector>
 
-#define KEY_ESCAPE 27
-#define KEY_BACKSPACE 8
-#define KEY_ENTER 13
-#define KEY_F10 324
-#define KEY_W 119
-#define KEY_A 97
-#define KEY_S 115
-#define KEY_D 100
-#define KEY_UP 328
-#define KEY_LEFT 331
-#define KEY_DOWN 336
-#define KEY_RIGHT 333
+constexpr int KEY_ESCAPE = 27;
+constexpr int KEY_BACKSPACE = 8;
+constexpr int KEY_ENTER = 13;
+constexpr int KEY_F10 = 324;
+constexpr int KEY_W = 119;
+constexpr int KEY_A = 97;
+constexpr int KEY_S = 115;
+constexpr int KEY_D = 100;
+constexpr int KEY_UP = 328;
+constexpr int KEY_LEFT = 331;
+constexpr int KEY_DOWN = 336;
+constexpr int KEY_RIGHT = 333;
 
 int GetKey() {
   int c = _getch();
@@ -67,9 +67,7 @@ static void handle_input(GameInput &input) {
 }
 
 static void to_begin_of_screen() {
-  std::cout << std::endl;
-  printf("\033[H\033[3J");
-  fflush(stdout);
+  std::cout << std::endl << "\033[H\033[3J" << std::flush;
 }
 
 static void print_board(const std::vector<std::vector<char>> &board,
@@ -131,11 +129,11 @@ fill_board(const std::pair<uint8_t, uint8_t> board_size,
   return board;
 }
 
-bool update_snake(std::deque<std::pair<int, int>> &snake_body,
-                  const std::pair<int, int> dir,
-                  const std::pair<uint8_t, uint8_t> board_size,
-                  const std::vector<std::vector<char>> &board,
-                  std::pair<int, int> &food_pos, int &score) {
+static bool update_snake(std::deque<std::pair<int, int>> &snake_body,
+                         const std::pair<int, int> dir,
+                         const std::pair<uint8_t, uint8_t> board_size,
+                         const std::vector<std::vector<char>> &board,
+                         std::pair<int, int> &food_pos, int &score) {
   std::pair<int, int> new_head = snake_body.front();
   new_head.first += dir.first;
   new_head.second += dir.second;
@@ -162,12 +160,21 @@ bool update_snake(std::deque<std::pair<int, int>> &snake_body,
   return true;
 }
 
+constexpr int BASE_SPEED_MS = 400;
+constexpr int SPEED_INCREMENT = 5;
+constexpr int MIN_SPEED_MS = 200;
+
 int main() {
   std::srand(std::time({}));
 
   GameInput game_input;
   game_input.is_game_on = true;
   std::pair<uint8_t, uint8_t> board_size{7, 11};
+
+  if (board_size.first < 3 || board_size.second < 3) {
+    board_size = {3, 3};
+  }
+
   int score{0};
 
   std::cout << std::string(board_size.second + 3, ' ')
@@ -193,16 +200,17 @@ int main() {
     if (!update_snake(snake_body, game_input.dir, board_size, board, food_pos,
                       score)) {
       game_input.is_game_on = false;
-      print_game_over(score);
-      return 0;
+      break;
     }
 
     to_begin_of_screen();
     board = fill_board(board_size, snake_body, food_pos);
     print_board(board, board_size, score);
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(std::max(200, 400 - score * 5)));
+    std::this_thread::sleep_for(std::chrono::milliseconds(
+        std::max(MIN_SPEED_MS, BASE_SPEED_MS - score * SPEED_INCREMENT)));
   }
+
+  print_game_over(score);
 
   return 0;
 }
