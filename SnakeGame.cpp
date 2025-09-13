@@ -18,7 +18,7 @@ constexpr int KEY_LEFT = 331;
 constexpr int KEY_DOWN = 336;
 constexpr int KEY_RIGHT = 333;
 
-int GetKey() {
+static int GetKey() {
   int c = _getch();
   if (c == 0 || c == 224)
     c = 256 + _getch(); /* If extended key (like F10), add 256. */
@@ -80,12 +80,12 @@ static void print_board(const std::vector<std::vector<char>> &board,
       std::cout << c;
     std::cout << '|' << '\n';
   }
-  std::cout << std::string(board_size.second + 2, '-') << '\n';
-  std::cout << "Score: " << score << '\n';
-  std::cout << std::endl;
+  std::cout << std::string(board_size.second + 2, '-') << '\n'
+            << "Score: " << score << '\n'
+            << std::endl;
 }
 
-static void print_game_over(int score) {
+static void print_game_over(const int score) {
   std::cout << std::endl
             << "Game Over!\n"
             << "Final Score: " << score << '\n'
@@ -93,38 +93,37 @@ static void print_game_over(int score) {
 }
 
 static std::pair<int, int>
-generate_food(const std::vector<std::vector<char>> &board,
+generate_new_food_pos(const std::vector<std::vector<char>> &board,
               const std::pair<uint8_t, uint8_t> board_size) {
   int i{board_size.first * board_size.second};
   std::pair<int, int> pos{0, 0};
   do {
-    // Generate random x and y values within the map
     pos.first = rand() % (board_size.first);
     pos.second = rand() % (board_size.second);
 
-    // If no space, return special pos
     if (--i == 0)
       return {-1, -1};
-    // If location is not free try again
   } while (board[pos.first][pos.second] != ' ');
 
-  // Return food position
   return pos;
+}
+
+static void put_food_on_board(const std::pair<uint8_t, uint8_t> board_size,
+                              std::vector<std::vector<char>> &board,
+                              const std::pair<int, int> food_pos) {
+  if (food_pos.first >= 0 && food_pos.first < board_size.first &&
+      food_pos.second >= 0 && food_pos.second < board_size.second)
+    board[food_pos.first][food_pos.second] = '@';
 }
 
 static std::vector<std::vector<char>>
 fill_board(const std::pair<uint8_t, uint8_t> board_size,
-           const std::deque<std::pair<int, int>> &snake_body,
-           const std::pair<int, int> food_pos) {
+           const std::deque<std::pair<int, int>> &snake_body) {
   std::vector<std::vector<char>> board{
       board_size.first, std::vector<char>(board_size.second, ' ')};
 
   for (auto &s : snake_body)
     board[s.first][s.second] = '*';
-
-  if (food_pos.first >= 0 && food_pos.first < board_size.first &&
-      food_pos.second >= 0 && food_pos.second < board_size.second)
-    board[food_pos.first][food_pos.second] = '@';
 
   return board;
 }
@@ -146,7 +145,7 @@ static bool update_snake(std::deque<std::pair<int, int>> &snake_body,
   switch (board[new_head.first][new_head.second]) {
   case '@':
     score += 1;
-    food_pos = generate_food(board, board_size);
+    food_pos = {-1, -1};
     break;
   case ' ':
     snake_body.pop_back();
@@ -161,11 +160,11 @@ static bool update_snake(std::deque<std::pair<int, int>> &snake_body,
 }
 
 constexpr int BASE_SPEED_MS = 400;
-constexpr int SPEED_INCREMENT = 5;
-constexpr int MIN_SPEED_MS = 200;
+constexpr int SPEED_INCREMENT = 20;
+constexpr int MIN_SPEED_MS = 100;
 
 int main() {
-  std::srand(std::time({}));
+  std::srand((unsigned int)std::time({}));
 
   GameInput game_input;
   game_input.is_game_on = true;
@@ -185,9 +184,9 @@ int main() {
   std::deque<std::pair<int, int>> snake_body{
       {rand() % (board_size.first), rand() % (board_size.second)}};
   std::vector<std::vector<char>> board =
-      fill_board(board_size, snake_body, {-1, -1});
-  std::pair<int, int> food_pos = generate_food(board, board_size);
-  board = fill_board(board_size, snake_body, food_pos);
+      fill_board(board_size, snake_body);
+  std::pair<int, int> food_pos = generate_new_food_pos(board, board_size);
+  put_food_on_board(board_size, board, food_pos);
 
   to_begin_of_screen();
   print_board(board, board_size, score);
@@ -204,7 +203,11 @@ int main() {
     }
 
     to_begin_of_screen();
-    board = fill_board(board_size, snake_body, food_pos);
+    board = fill_board(board_size, snake_body);
+    if ((food_pos.first == -1) && (food_pos.second == -1)) {
+      food_pos = generate_new_food_pos(board, board_size);
+    }
+    put_food_on_board(board_size, board, food_pos);
     print_board(board, board_size, score);
     std::this_thread::sleep_for(std::chrono::milliseconds(
         std::max(MIN_SPEED_MS, BASE_SPEED_MS - score * SPEED_INCREMENT)));
